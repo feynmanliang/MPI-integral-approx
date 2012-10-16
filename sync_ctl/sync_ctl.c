@@ -16,15 +16,18 @@
 #define msgrecv(buffp, from) \
   MPI_Recv(buffp, sizeof(buffp), MPI_BYTE, from, MYTAG, MPI_COMM_WORLD, &status);
 
-#define NEXT (rank + total + dir) % total
+#define NEXT (dir != 0) ? ((rank + total - 1 + dir) % (total - 1)) : 0
 
-#define PREV (rank + total - dir) % total
+#define PREV (dir != 0) ? ((rank + total - 1 - dir) % (total - 1)) : 0
+
+#define PRINTER total - 1
 
 int main(int argc, char **argv) {
    int rank, total;
    int active_node;
    char buff;
    int dir;
+   int numPrinted;
    MPI_Status status;
 
    msginit(&argc,&argv,&rank,&total);
@@ -32,42 +35,36 @@ int main(int argc, char **argv) {
    dir = atoi(argv[1]);
 
    if (rank == 0) {
+      msgsend(&buff, PRINTER);
+      msgrecv(&buff, PRINTER);
       if (dir == 0) {
          /* manager-worker's manager node */
-         printf("hello: %d processes, process %d\n", total, rank);
-         for (active_node = 1; active_node < total; active_node++) {
+         for (active_node = 1; active_node < total - 1; active_node++) {
             msgsend(&buff, active_node);
             msgrecv(&buff, active_node);
-            /* also serves as printer node */
-            printf("hello: %d processes, process %d\n", total, active_node);
          }
       }
       else {
-         printf("hello: %d processes, process %d\n", total, rank);
          msgsend(&buff, NEXT);
-         /* printer node */
-         for (active_node = NEXT; 
-           ((active_node + total - dir) % total ) != PREV;
-           active_node = (active_node + total + dir) % total) {
-            msgrecv(&buff, active_node);
-            printf("hello: %d processes, process %d\n", total, active_node);
-            msgsend(&buff, active_node)
-         }
          msgrecv(&buff, PREV);
       }
    }
 
+   else if (rank == PRINTER) {
+      numPrinted = 0;
+      while (numPrinted < total - 1) {
+         msgrecv(&buff, MPI_ANY_SOURCE);
+         printf("hello: %d processes, process %d\n", total-1, status.MPI_SOURCE);
+         numPrinted++;
+         msgsend(&buff, status.MPI_SOURCE);
+      }
+   }
+
    else {
-      if (dir == 0) { 
-         msgrecv(&buff, 0); 
-         msgsend(&buff, 0); 
-      }
-      else { 
-         msgrecv(&buff, PREV); 
-         msgsend(&buff, 0);
-         msgrecv(&buff, 0);
-         msgsend(&buff, NEXT); 
-      }
+      msgrecv(&buff, PREV); 
+      msgsend(&buff, PRINTER);
+      msgrecv(&buff, PRINTER);
+      msgsend(&buff, NEXT); 
    }
 
    fflush(stdout);
