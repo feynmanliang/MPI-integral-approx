@@ -19,10 +19,10 @@ clean:
 	rm -f *~ $(OFILES) $(BIN)
 
 mpirun_manager: 
-	mpirun -hostfile myhosts ./$(BIN) 1
+	mpirun -hostfile myhosts ./$(BIN) 0
 	
 mpirun_token: 
-	mpirun -hostfile myhosts ./$(BIN) 2
+	mpirun -hostfile myhosts ./$(BIN) 1
 
 mpirun_reverse: 
-	mpirun -hostfile myhosts ./$(BIN) 3
+	mpirun -hostfile myhosts ./$(BIN) -1

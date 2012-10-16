@@ -16,52 +16,59 @@
 #define msgrecv(buffp, from) \
   MPI_Recv(buffp, sizeof(buffp), MPI_BYTE, from, MYTAG, MPI_COMM_WORLD, &status);
 
+#define NEXT (rank + total + dir) % total
+
+#define PREV (rank + total - dir) % total
+
 int main(int argc, char **argv) {
-   int sync;
    int rank, total;
-   int start, end, prevoffset, nextoffset, active_node;
-   char buff = 2;
+   int active_node;
+   char buff;
+   int dir;
    MPI_Status status;
 
    msginit(&argc,&argv,&rank,&total);
 
-   sync = atoi(argv[1]);
+   dir = atoi(argv[1]);
 
-   if (sync == 1 ) {
-      start = 0;
-      end = total;
-      prevoffset = nextoffset = -rank;
-   }
-
-   else if (sync == 2) {
-      start = 0;
-      end = total - 1;
-      prevoffset = -1;
-      nextoffset = 1;
-   }
-
-   else if (sync == 3) {
-      start = total - 1;
-      end = 0;
-      prevoffset = 1;
-      nextoffset = -1;
-   }
-
-   /* block all non-start nodes */
-   if (rank != start) { msgrecv(&buff, rank + prevoffset); }
-
-   if (sync == 1 && rank == 0) { 
-      /* manager-worker's manager node */
-      printf("hello: %d processes, process %d\n", total, rank);
-      for (active_node = 1; active_node < total; active_node++) {
-         msgsend(&buff, active_node);
-         msgrecv(&buff, active_node);
+   if (rank == 0) {
+      if (dir == 0) {
+         /* manager-worker's manager node */
+         printf("hello: %d processes, process %d\n", total, rank);
+         for (active_node = 1; active_node < total; active_node++) {
+            msgsend(&buff, active_node);
+            msgrecv(&buff, active_node);
+            /* also serves as printer node */
+            printf("hello: %d processes, process %d\n", total, active_node);
+         }
+      }
+      else {
+         printf("hello: %d processes, process %d\n", total, rank);
+         msgsend(&buff, NEXT);
+         /* printer node */
+         for (active_node = NEXT; 
+           ((active_node + total - dir) % total ) != PREV;
+           active_node = (active_node + total + dir) % total) {
+            msgrecv(&buff, active_node);
+            printf("hello: %d processes, process %d\n", total, active_node);
+            msgsend(&buff, active_node)
+         }
+         msgrecv(&buff, PREV);
       }
    }
-   else { printf("hello: %d processes, process %d\n", total, rank); }
 
-   /* continue passing message if not end */
-   if (rank != end) { msgsend(&buff, rank + nextoffset); }
+   else {
+      if (dir == 0) { 
+         msgrecv(&buff, 0); 
+         msgsend(&buff, 0); 
+      }
+      else { 
+         msgrecv(&buff, PREV); 
+         msgsend(&buff, 0);
+         msgrecv(&buff, 0);
+         msgsend(&buff, NEXT); 
+      }
+   }
 
    fflush(stdout);
    MPI_Finalize();
