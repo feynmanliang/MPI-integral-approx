@@ -18,16 +18,12 @@
 }  
 
 #define msgsend(buffp, to) \
-  MPI_Send(buffp, sizeof(buffp), MPI_BYTE, to, MYTAG, MPI_COMM_WORLD);
+  MPI_Send(buffp, 1, mpi_approx, to, MYTAG, MPI_COMM_WORLD);
 
 #define msgrecv(buffp, from) \
-  MPI_Recv(buffp, sizeof(buffp), MPI_BYTE, from, MYTAG, MPI_COMM_WORLD, &status);
+  MPI_Recv(buffp, 1, mpi_approx, from, MYTAG, MPI_COMM_WORLD, &status);
 
-#define msgrecv(buffp, from) \
-  MPI_Recv(buffp, sizeof(buffp), MPI_BYTE, from, MYTAG, MPI_COMM_WORLD, &status);
-
-#define msgrecv(buffp, from) \
-  MPI_Recv(buffp, sizeof(buffp), MPI_BYTE, from, MYTAG, MPI_COMM_WORLD, &status);
+#define MPI_WTIME_IS_GLOBAL true
 
 double fn0(double);
 double fn1(double);
@@ -35,20 +31,28 @@ double fn2(double);
 double fn3(double);
 
 int main(int argc, char *argv[]) {
-   double start;
-   double end;
-   double node_portion;
    double (*funcArr[3])(double);
    int fn_num;
+   double start;
+   double end;
    double precision;
+   double node_portion;
    int thds_per_node;
-
    int rank, total;
    int active_node;
-   struct integralApprox buff;
    MPI_Status status;
 
    msginit(&argc,&argv,&rank,&total);
+
+   /* construct derived datatype */
+   int blocklengths[2] = {1, 1};
+   MPI_Datatype types[2] = {MPI_DOUBLE, MPI_INT};
+   MPI_Datatype mpi_approx;
+   MPI_Aint offsets[2];
+   offsets[0] = offsetof(struct integralApprox, value);
+   offsets[1] = offsetof(struct integralApprox, num_strips);
+   MPI_Type_create_struct(2, blocklengths, offsets, types, &mpi_approx);
+   MPI_Type_commit(&mpi_approx);
 
    if ( argc < 4 ) {
       printf( "usage: %s fn_num start end (precision=0.01) (thds_per_node=10)\n", argv[0] );
@@ -71,32 +75,41 @@ int main(int argc, char *argv[]) {
    if ( argc >= 6) { thds_per_node = atof(argv[5]); }
 
    if (rank == 0) {
+      double starttime, endtime;
+      struct integralApprox buff;
       double final_value;
       int tot_num_strips = 0;
       int nodesReceived = 0;
+
+      starttime = MPI_Wtime();
 
       for (active_node = 1; active_node < total; active_node++) {
          msgsend(&buff, active_node);
       }
       while (nodesReceived < total-1) {
          msgrecv(&buff, MPI_ANY_SOURCE);
+         nodesReceived++;
          printf("Proccess %d returned value %f with numstrips %d\n", status.MPI_SOURCE, buff.value, buff.num_strips);
          final_value += buff.value;
          tot_num_strips += buff.num_strips;
-         printf("%d out of %d\n", ++nodesReceived, total-1);
+         /* printf("%d out of %d\n", nodesReceived, total-1); */
       }
-      printf("value: %f, tot_num_strips: %d\n", final_value, tot_num_strips);
+
+      endtime = MPI_Wtime();
+      printf("Value: %f, Total Num Strips: %d\n", final_value, tot_num_strips);
+      printf("Time taken: %f seconds\n", endtime - starttime);
    }
 
    else {
-      msgrecv(&buff, 0); 
-      buff = threaded_integrate(funcArr[fn_num], 
+      struct integralApprox result;
+      msgrecv(&result, 0); 
+      result = threaded_integrate(funcArr[fn_num], 
         start + (rank - 1) * node_portion,
         start + (rank) * node_portion,
         precision,
         thds_per_node);
-      printf("node: %d, value: %f, numstrips: %d\n", rank, buff.value, buff.num_strips);
-      msgsend(&buff, 0); 
+      /* printf("node: %d, value: %f, numstrips: %d\n", rank, result.value, result.num_strips); */
+      msgsend(&result, 0);
    }
 
    fflush(stdout);
