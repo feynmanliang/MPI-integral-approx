@@ -12,11 +12,11 @@ all:	sync_ctl
 	$(CC) -c $(CFLAGS) $< -o $@
 
 sync_ctl:	$(OFILES) $(HFILES)
-	        $(CC) $(CFLAGS) $(OFILES) -o bin\$(BIN)
+	        $(CC) $(CFLAGS) $(OFILES) -o ./bin/$(BIN)
 
 
 clean:	
-	rm -f *~ $(OFILES) $(BIN)
+	rm -f *~ $(OFILES) ./bin/$(BIN)
 
 mpirun: 
-	mpirun -hostfile myhosts ./$(BIN) 1 0 10
+	mpirun -hostfile myhosts ./bin/$(BIN) 1 0 10
