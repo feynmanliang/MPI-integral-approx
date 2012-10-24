@@ -27,6 +27,7 @@ double fn0(double);
 double fn1(double);
 double fn2(double);
 double fn3(double);
+double fn4(double);
 
 public struct processApprox {
   double value;
@@ -35,7 +36,7 @@ public struct processApprox {
 };
 
 int main(int argc, char *argv[]) {
-   double (*funcArr[3])(double);
+   double (*funcArr[4])(double);
    int fn_num;
    double start;
    double end;
@@ -71,6 +72,7 @@ int main(int argc, char *argv[]) {
       funcArr[1] = &fn1;
       funcArr[2] = &fn2;
       funcArr[3] = &fn3;
+      funcArr[4] = &fn4;
 
       start = atof(argv[2]);
       end = atof(argv[3]);
@@ -158,4 +160,8 @@ double fn2(double x) {
 
 double fn3(double x) {
    return 2 * pow(x, 2) + 9 * x + 4;
+}
+
+double fn4(double x) {
+   return x * sin(pow(x, 2));
 }

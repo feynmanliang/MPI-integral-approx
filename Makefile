@@ -12,7 +12,7 @@ all:	sync_ctl
 	$(CC) -c $(CFLAGS) $< -o $@
 
 sync_ctl:	$(OFILES) $(HFILES)
-	        $(CC) $(CFLAGS) $(OFILES) -o $(BIN)
+	        $(CC) $(CFLAGS) $(OFILES) -o ./bin/$(BIN)
 
 
 clean:	
